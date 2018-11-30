@@ -1,0 +1,18 @@
+{
+    "name": "saied/upload-manager",
+    "description": "UploadManger hasMany polymorph Files",
+    "authors": [
+        {
+            "name": "saeid01",
+            "email": "saeidkhakbazan@gmail.com"
+        }
+    ],
+    "autoload" : {
+        "psr-4" : {
+            "Saeid\\UploadManger\\" : "src/"
+        }
+    },
+    "require": {
+        "Illuminate/Support" : "~5"
+    }
+}
