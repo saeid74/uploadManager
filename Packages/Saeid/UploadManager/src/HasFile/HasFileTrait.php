@@ -13,6 +13,19 @@ trait HasFileTrait
     *
     * @return \Spatie\MediaLibrary\FileAdder\FileAdder
     */
+    public function addFile(string $key)
+    {
+        return app(FileAdderFactory::class)->createFromRequest($this);
+    }
+
+
+    /**
+    * Add a file from a request.
+    *
+    * @param string $key
+    *
+    * @return \Spatie\MediaLibrary\FileAdder\FileAdder
+    */
     public function addFileFromRequest(string $key)
     {
         return app(FileAdderFactory::class)->createFromRequest($this, $key);
@@ -20,71 +33,15 @@ trait HasFileTrait
 
 
     /**
-    * Add a remote file to the medialibrary.
+    * Add a file from a request.
     *
-    * @param string $url
-    * @param string|array ...$allowedMimeTypes
-    *
-    * @return \Spatie\MediaLibrary\FileAdder\FileAdder
-    *
-    * @throws \Spatie\MediaLibrary\Exceptions\FileCannotBeAdded
-    */
-    public function addFileFromUrl(string $url, ...$allowedMimeTypes)
-    {
-        if (! $stream = @fopen($url, 'r')) {
-            throw UnreachableUrl::create($url);
-        }
-        $temporaryFile = tempnam(sys_get_temp_dir(), 'media-library');
-        file_put_contents($temporaryFile, $stream);
-        $this->guardAgainstInvalidMimeType($temporaryFile, $allowedMimeTypes);
-        $filename = basename(parse_url($url, PHP_URL_PATH));
-        $filename = str_replace('%20', ' ', $filename);
-        if ($filename === '') {
-            $filename = 'file';
-        }
-        $mediaExtension = explode('/', mime_content_type($temporaryFile));
-        if (! str_contains($filename, '.')) {
-            $filename = "{$filename}.{$mediaExtension[1]}";
-        }
-        return app(FileAdderFactory::class)->create($this, $temporaryFile)
-        ->usingName(pathinfo($filename, PATHINFO_FILENAME))
-        ->usingFileName($filename);
-    }
-
-
-    /**
-    * Add a base64 encoded file to the medialibrary.
-    *
-    * @param string $base64data
-    * @param string|array ...$allowedMimeTypes
-    *
-    * @throws InvalidBase64Data
-    * @throws \Spatie\MediaLibrary\Exceptions\FileCannotBeAdded
+    * @param string $key
     *
     * @return \Spatie\MediaLibrary\FileAdder\FileAdder
     */
-    public function addFileFromBase64(string $base64data, ...$allowedMimeTypes): FileAdder
+    public function addFileCropFromRequest(string $keyFile,string $keyCropData)
     {
-        // // strip out data uri scheme information (see RFC 2397)
-        // if (strpos($base64data, ';base64') !== false) {
-        //     [$_, $base64data] = explode(';', $base64data);
-        //     [$_, $base64data] = explode(',', $base64data);
-        // }
-        // // strict mode filters for non-base64 alphabet characters
-        // if (base64_decode($base64data, true) === false) {
-        //     throw InvalidBase64Data::create();
-        // }
-        // // decoding and then reeconding should not change the data
-        // if (base64_encode(base64_decode($base64data)) !== $base64data) {
-        //     throw InvalidBase64Data::create();
-        // }
-        // $binaryData = base64_decode($base64data);
-        // // temporarily store the decoded data on the filesystem to be able to pass it to the fileAdder
-        // $tmpFile = tempnam(sys_get_temp_dir(), 'medialibrary');
-        // file_put_contents($tmpFile, $binaryData);
-        // $this->guardAgainstInvalidMimeType($tmpFile, $allowedMimeTypes);
-        // $file = app(FileAdderFactory::class)->create($this, $tmpFile);
-        // return $file;
+        return app(FileAdderFactory::class)->createFromRequest($this, $keyFile, $keyCropData);
     }
 
 
