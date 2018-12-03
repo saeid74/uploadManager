@@ -8,15 +8,16 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 class FileAdder
 {
     protected $role;
-    protected $path;
+    protected $path = null;
     protected $file;
-    protected $image;
+    protected $image = null;
     protected $model;
     protected $userId;
-    protected $quality;
-    protected $cropData;
+    protected $quality = 80;
+    protected $cropData = null;
     protected $fileName;
     protected $extension;
+    protected $imageRole;
     protected $businessId;
     protected $startPortion;
     protected $waterMarkImage;
@@ -34,7 +35,7 @@ class FileAdder
         return $this;
     }
 
-    public function setCropData($cropData)
+    public function setCropData(array $cropData)
     {
         $this->cropData = $cropData;
         return $this;
@@ -46,6 +47,12 @@ class FileAdder
         return $this;
     }
 
+    public function setImageRole($imageRole)
+    {
+        $this->imageRole = $imageRole;
+        return $this;
+    }
+
     public function setUserId(int $userId)
     {
         $this->userId = $userId;
@@ -54,10 +61,12 @@ class FileAdder
 
     public function setPath(string $path = null)
     {
-        if (!$path && $model && $model->imagePath ) {
+        if (!$path && !$this->path && $model && $model->imagePath ) {
             $this->path = $model->imagePath;
-        } else {
+        } elseif($path) {
             $this->path = $path;
+        } else {
+            $this->path = config('path.');
         }
         return $this;
     }
@@ -104,6 +113,7 @@ class FileAdder
         if ($this->random) {
             $randName .= '-' . uniqid();
         }
+        $randName = $this->defaultSanitizer($randName);
         $this->fileName = $randName . '.' . $this->extension;
     }
 
@@ -114,9 +124,6 @@ class FileAdder
 
     private function setDirectroy()
     {
-        if(!$this->path) {
-            $this->path = config('');
-        }
         preg_match_all('/{(.*?)}/', $this->path, $match);
         if (!empty($match)) {
             foreach ($match[1] as $matched_value) {
@@ -147,6 +154,26 @@ class FileAdder
 
     private function cropImage()
     {
+        if ($this->cropData && $this->image) {
+            $cropData = $this->cropData;
+            $this->image = $this->image->crop($cropData[0], $cropData[1], $cropData[2], $cropData[3]);
+            if($cropData[2] < 0 or $cropData[3] < 0) {
+                $background = Image::canvas($cropData[0], $cropData[1]);
+                $background->insert($this->image, 'center');
+                $this->image = $background;
+            }
+        }
+
+        // if (!empty($this->imageOperations)) {
+        //     foreach ($this->imageOperations as $name => $parameters) {
+        //         if($name != 'temp_size')
+        //             $this->{$name} ($parameters);
+        //     }
+        // }
+    }
+
+    private function resizeImage()
+    {
 
     }
 
@@ -166,11 +193,13 @@ class FileAdder
     {
         $this->setPath();
         $this->setDirectroy();
+        $this->generate_image_name();
+
     }
 
     public function saveInDb()
     {
-        
+
     }
 
     public function attachFile()
