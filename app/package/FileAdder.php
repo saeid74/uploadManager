@@ -11,17 +11,18 @@ class FileAdder
     protected $path = null;
     protected $file;
     protected $image = null;
-    protected $model;
+    protected $model = null;
     protected $userId;
     protected $quality = 80;
     protected $cropData = null;
     protected $fileName;
     protected $extension;
     protected $imageRole;
-    protected $businessId;
+    protected $storeInDB = true;
+    protected $businessId = null;
     protected $startPortion;
     protected $waterMarkImage;
-    protected $spUserTemplateId;
+    protected $spUserTemplateId = null;
 
 
     public function __construct()
@@ -35,9 +36,9 @@ class FileAdder
         return $this;
     }
 
-    public function setCropData(array $cropData)
+    public function setStoreInDB(bool $storeInDB)
     {
-        $this->cropData = $cropData;
+        $this->storeInDB = $storeInDB;
         return $this;
     }
 
@@ -66,7 +67,7 @@ class FileAdder
         } elseif($path) {
             $this->path = $path;
         } else {
-            $this->path = config('path.');
+            // TODO: // $this->path = config('path.');
         }
         return $this;
     }
@@ -152,6 +153,39 @@ class FileAdder
         }
     }
 
+    private function uploadPath($path)
+    {
+        $imageDisk = config( );
+        $fileDisk = config( );
+        if ($this->image) {
+            Storage::disk($this->imageDisk)->makeDirectory($this->destinationDir);
+            return Storage::disk($this->imageDisk)->getDriver()->getAdapter()->getPathPrefix() . $path;
+        } else {
+            Storage::disk($this->fileDisk)->makeDirectory($this->destinationDir);
+            return Storage::disk($this->fileDisk)->getDriver()->getAdapter()->getPathPrefix() . $path;
+        }
+
+    }
+
+
+
+    public function addFile($file): self
+    {
+        $this->file = $file;
+    }
+
+    public function addImage($file, $cropData): self
+    {
+        $this->file  = $file;
+        $this->cropData  = $cropData;
+        $this->image = Image::make($file);
+        if ($image instanceof UploadedFile) {
+            $this->extension = $file->getClientOriginalExtension();
+        } else {
+            $this->getImageExtension();
+        }
+    }
+
     private function cropImage()
     {
         if ($this->cropData && $this->image) {
@@ -163,30 +197,36 @@ class FileAdder
                 $this->image = $background;
             }
         }
-
-        // if (!empty($this->imageOperations)) {
-        //     foreach ($this->imageOperations as $name => $parameters) {
-        //         if($name != 'temp_size')
-        //             $this->{$name} ($parameters);
-        //     }
-        // }
+        if ($this->wateMark) {
+            $watermark = Image::make($this->wateMark);
+            $this->image->insert($watermark, 'center');
+        }
     }
 
-    private function resizeImage()
+    private function resizeImage($params)
     {
+        $width = array_get($params, 'width', 640);
+        $width = ( $width ) ? $width : 640;
+        $height = array_get($params, 'height', null);
+        if ($height != null) {
+            $widthInput = $this->image->width();
+            $heightInput = $this->image->height();
 
-    }
+            $aspectRatio = $height / $width;
 
-    public function addFile($file): self
-    {
-        $this->file = $file;
-    }
+            if ((int)($widthInput * $height / $width) < (int)$heightInput) {
+                $widthInput = round($heightInput / $aspectRatio);
+            } else {
+                $heightInput = round($widthInput * $aspectRatio);
+            }
+            $background = Image::canvas($widthInput, $heightInput);
+            $background->insert($this->image, 'center');
+            $this->image = $background;
+        }
 
-    public function addImage($file): self
-    {
-        $this->file  = $file;
-        $this->image = Image::make($file);
-        $this->getImageExtension();
+        $this->image->resize($width, $height, function ($constraint) {
+            $constraint->aspectRatio();
+        });
     }
 
     public function uploadFile()
@@ -194,24 +234,63 @@ class FileAdder
         $this->setPath();
         $this->setDirectroy();
         $this->generate_image_name();
+        $path = $this->uploadPath($this->destinationDir . '/' . $this->fileName);
+        if ($this->image) {
+            $this->image->save($path, $this->quality);
+        } else {
+            $this->file->move($path,$this->file->getClientOriginalName());
+        }
 
+        return $path;
     }
 
-    public function saveInDb()
+    private function storeGallery(string $path, int $parentId = null, string $image_size = null): Gallery
     {
+        $mediaClass = config('uploadManager.model');
+        $gallery = new $mediaClass();
+        $gallery->user_id = $this->find_user_id();
+        $gallery->business_id = $this->businessId;
+        $gallery->sp_user_template_id = $this->spUserTemplateId;
+        $gallery->parent_id = $parentId;
+        $gallery->path = $path;
+        $gallery->crop_data = $this->cropData;
+        $gallery->image_size = $image_size;
+        $gallery->save();
+        return $gallery;
+    }
 
+    private function storeDatabase($path, $parentId = null, $imageSize = null)
+    {
+        if ($this->model) {
+            return $this->model->images()->save(
+                $this->storeGallery($path, $parentId, $image_size),
+                ['image_role' => $this->role]
+            );
+        } else {
+            if ($this->storeInDB) {
+                return $this->storeGallery($path, $parentId, $imageSize);
+            }
+        }
     }
 
     public function attachFile()
     {
         $this->uploadFile();
-        $this->saveInDb();
-    }
+        $this->storeDatabase();
+        if ($this->image) {
+            foreach ($variable as $key => $value) {
+                $this->thumbnailImage();
+            }
+        }
 
-    public function preservingOriginal(): self
+    }
+    public function thumbnailImage()
     {
-        $this->preserveOriginal = true;
-        return $this;
+        $this->image = Image::make($this->file);
+        $this->cropImage();
+        $this->uploadFile();
+        $this->resizeImage();
+        $this->storeDatabase();
     }
 
 }
