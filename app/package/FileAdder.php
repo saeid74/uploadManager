@@ -22,6 +22,7 @@ class FileAdder
     protected $businessId = null;
     protected $startPortion;
     protected $waterMarkImage;
+    protected $backgroundImage = '#fff';
     protected $spUserTemplateId = null;
 
 
@@ -39,6 +40,12 @@ class FileAdder
     public function setStoreInDB(bool $storeInDB)
     {
         $this->storeInDB = $storeInDB;
+        return $this;
+    }
+
+    public function setBackgroundImage(string $backgroundImage)
+    {
+        $this->backgroundImage = $backgroundImage;
         return $this;
     }
 
@@ -67,7 +74,7 @@ class FileAdder
         } elseif($path) {
             $this->path = $path;
         } else {
-            // TODO: // $this->path = config('path.');
+            // TODO: $this->path = config('path.');
         }
         return $this;
     }
@@ -155,8 +162,8 @@ class FileAdder
 
     private function uploadPath($path)
     {
-        $imageDisk = config( );
-        $fileDisk = config( );
+        $imageDisk = config( 'uploadmanager.default_filesystem.image' );
+        $fileDisk = config( 'uploadmanager.default_filesystem.file' );
         if ($this->image) {
             Storage::disk($this->imageDisk)->makeDirectory($this->destinationDir);
             return Storage::disk($this->imageDisk)->getDriver()->getAdapter()->getPathPrefix() . $path;
@@ -164,10 +171,7 @@ class FileAdder
             Storage::disk($this->fileDisk)->makeDirectory($this->destinationDir);
             return Storage::disk($this->fileDisk)->getDriver()->getAdapter()->getPathPrefix() . $path;
         }
-
     }
-
-
 
     public function addFile($file): self
     {
@@ -192,7 +196,7 @@ class FileAdder
             $cropData = $this->cropData;
             $this->image = $this->image->crop($cropData[0], $cropData[1], $cropData[2], $cropData[3]);
             if($cropData[2] < 0 or $cropData[3] < 0) {
-                $background = Image::canvas($cropData[0], $cropData[1]);
+                $background = Image::canvas($cropData[0], $cropData[1], $this->backgroundImage);
                 $background->insert($this->image, 'center');
                 $this->image = $background;
             }
@@ -219,7 +223,7 @@ class FileAdder
             } else {
                 $heightInput = round($widthInput * $aspectRatio);
             }
-            $background = Image::canvas($widthInput, $heightInput);
+            $background = Image::canvas($widthInput, $heightInput, $this->backgroundImage);
             $background->insert($this->image, 'center');
             $this->image = $background;
         }
@@ -278,19 +282,18 @@ class FileAdder
         $this->uploadFile();
         $this->storeDatabase();
         if ($this->image) {
-            foreach ($variable as $key => $value) {
-                $this->thumbnailImage();
+            foreach ($this->model && $this->model as $key => $value) {
+                $this->thumbnailImage($value);
             }
         }
-
     }
-    public function thumbnailImage()
+    public function thumbnailImage($param)
     {
         $this->image = Image::make($this->file);
         $this->cropImage();
         $this->uploadFile();
-        $this->resizeImage();
-        $this->storeDatabase();
+        $this->resizeImage($param);
+        $image = $this->storeDatabase();
     }
 
 }
