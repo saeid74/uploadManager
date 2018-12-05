@@ -20,11 +20,13 @@ Route::get('/', function () {
 
 Route::get('/test', function ()
 {
+    dd(Storage::disk('media')->getDriver()->getAdapter()->getPathPrefix());
     return view('test');
 });
 
 Route::post('/test', function (Request $request)
 {
+
     dd(Image::make($request->avatar));
     dd($request->all());
 });
